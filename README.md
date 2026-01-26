@@ -1,10 +1,10 @@
 ## installation
 
-**Jenkins**
+### Jenkins
 - https://www.jenkins.io/download/
-**Docker**
+### Docker
 - https://docs.docker.com/engine/install/ubuntu/
-**SonarQube**
+### SonarQube
 ````
 docker run -d --name sonar -p 9000:9000 sonarqube:lts-community
 ````
