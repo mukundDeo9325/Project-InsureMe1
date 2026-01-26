@@ -91,64 +91,109 @@ Step5: In Jenkins
 ![image](https://github.com/user-attachments/assets/c5d05628-1502-4a92-b722-7ad3eed5d587)
 
 ## Restart Jenkins
+`sudo systemctl restart jenkins`
+
+## install trivy to image scan 
+`vim trivy.sh`
+```bash
+sudo apt-get install wget apt-transport-https gnupg lsb-release -y
+wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor | sudo tee /usr/share/keyrings/trivy.gpg > /dev/null
+echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+sudo apt-get update
+sudo apt-get install trivy -y
+```
+
+## Docker Image Build and Push
+- install plugins to use docker
+  `docker`
+  `Docker Commons`
+  `Docker Pipeline`
+  `Docker API`
+  `docker-build-step`
+- configure docker credentials in credentials session  
+  <img width="1467" height="825" alt="Screenshot 2026-01-27 at 1 13 19 AM" src="https://github.com/user-attachments/assets/2f10de10-5cf7-43a6-b837-06fba3142115" />
 
 ##  Create Pipeline
 ```groovy
 pipeline {
-    agent any 
-
-    tools {
-        maven 'maven'
-    }
+    agent any
 
     environment {
         SCANNER_HOME = tool 'sonar-scanner'
+        DOCKER_IMAGE = "mukunddeo9325/insure-me"
     }
 
     stages {
 
-        stage('code-pull') {
+        stage('Code Pull') {
             steps {
-                git branch: 'main', url: 'https://github.com/mukundDeo9325/Project-InsureMe1.git'
+                git branch: 'main',
+                url: 'https://github.com/mukundDeo9325/Project-InsureMe1.git'
             }
         }
 
-        stage('code-build') {
+        stage('Code Build') {
             steps {
                 sh 'mvn clean package'
             }
         }
 
-        stage("code-test-analysis") {
+        stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('sonar-server') {
                     sh '''
-                        $SCANNER_HOME/bin/sonar-scanner \
-                        -Dsonar.projectKey=InsureMe \
-                        -Dsonar.projectName=InsureMe \
-                        -Dsonar.sources=src \
-                        -Dsonar.java.binaries=target/classes
+                    $SCANNER_HOME/bin/sonar-scanner \
+                    -Dsonar.projectKey=InsureMe \
+                    -Dsonar.projectName=InsureMe \
+                    -Dsonar.sources=src \
+                    -Dsonar.java.binaries=target/classes
                     '''
                 }
             }
         }
 
-        stage("code-test-quality gate") {
+        stage('Quality Gate') {
             steps {
                 script {
-                    waitForQualityGate abortPipeline: false, credentialsId: 'sonar-token'
+                    waitForQualityGate abortPipeline: true, credentialsId: 'Sonar-token'
                 }
             }
         }
 
-
-        stage('code-deploy') {
+        stage('Build & Push Docker Image') {
             steps {
-                sh 'docker build -t insure-me .'
-                sh 'docker run -itd --name insure-me -p 8089:8081 insure-me'
+                script {
+                    withDockerRegistry(credentialsId: 'docker') {
+                        sh '''
+                        docker build -t insure-me .
+                        docker tag insure-me ${DOCKER_IMAGE}:latest
+                        docker push ${DOCKER_IMAGE}:latest
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Trivy Image Scan') {
+            steps {
+                sh '''
+                trivy image ${DOCKER_IMAGE}:latest > trivy-report.txt
+                '''
+            }
+        }
+
+        stage('Deploy Container') {
+            steps {
+                sh '''
+                docker rm -f insure-me || true
+                docker run -d \
+                --name insure-me \
+                -p 8089:8081 \
+                ${DOCKER_IMAGE}:latest
+                '''
             }
         }
     }
 }
-
 ```
+- check your application on `public_ip:8089`
