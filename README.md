@@ -28,7 +28,7 @@ stage view
    - add SonarQube Scanner: "sonar-scanner"
    - docker: "docker"
 
-### **Configure SonarQube-Scanner and Docker in Global Tool Configuration**
+### **Configure SonarQube-Scanner and Docker in Global credentials Configuration**
 
 #### SonarQube-Scanner
 ![image](https://github.com/user-attachments/assets/24589963-9a7e-4d6a-9598-66580c195e30)
